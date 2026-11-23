@@ -3,38 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>نظام متابعة البلاغات والصيانة الداخلية</title>
+  <title>رَصْد | منصة ذكية لمتابعة البلاغات والصيانة الداخلية</title>
+  <meta name="description" content="رصد: نموذج أولي لمنصة ذكية تصنف البلاغات الداخلية تلقائياً وتتابعها حتى إنجازها - مشروع تدريب تعاوني في أمانة منطقة حائل" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="container topbar-content">
-      <div>
-        <h1>نظام متابعة البلاغات والصيانة الداخلية</h1>
-        <p>نموذج أولي لإدارة ومتابعة الطلبات الفنية والإدارية - فترة التدريب التعاوني</p>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">ر</div>
+        <div>
+          <h1>رَصْد <span>| منصة ذكية لمتابعة البلاغات والصيانة الداخلية</span></h1>
+          <p>أمانة منطقة حائل - إدارة تقنية المعلومات · نموذج أولي يعمل ببيانات افتراضية</p>
+        </div>
       </div>
-      <button id="resetDemoBtn" class="btn btn-outline">إعادة البيانات التجريبية</button>
+      <div class="top-actions">
+        <button id="exportBtn" class="btn btn-outline" type="button">تصدير Excel (CSV)</button>
+        <button id="resetDemoBtn" class="btn btn-outline" type="button">إعادة البيانات التجريبية</button>
+      </div>
     </div>
   </header>
 
   <main class="container">
     <!-- بطاقات الإحصائيات -->
-    <section class="stats-grid">
-      <div class="stat-card">
-        <span>إجمالي البلاغات</span>
-        <strong id="totalCount">0</strong>
+    <section class="stats-grid" aria-label="الإحصائيات">
+      <div class="stat-card"><span>إجمالي البلاغات</span><strong id="totalCount">0</strong></div>
+      <div class="stat-card"><span>جديد</span><strong id="newCount">0</strong></div>
+      <div class="stat-card"><span>قيد المعالجة</span><strong id="progressCount">0</strong></div>
+      <div class="stat-card"><span>منجز</span><strong id="doneCount">0</strong></div>
+      <div class="stat-card danger"><span>عاجل مفتوح</span><strong id="urgentCount">0</strong></div>
+    </section>
+
+    <!-- المساعد الذكي + الرسوم -->
+    <section class="two-col">
+      <div class="card">
+        <h2><span class="ai-dot"></span> المساعد الذكي</h2>
+        <p class="muted small">يحلل البلاغات تلقائياً ويعرض أهم الملاحظات والتوصيات.</p>
+        <ul id="insightsList" class="insights"></ul>
       </div>
-      <div class="stat-card">
-        <span>جديد</span>
-        <strong id="newCount">0</strong>
-      </div>
-      <div class="stat-card">
-        <span>قيد المعالجة</span>
-        <strong id="progressCount">0</strong>
-      </div>
-      <div class="stat-card">
-        <span>منجز</span>
-        <strong id="doneCount">0</strong>
+      <div class="card">
+        <h2>توزيع البلاغات المفتوحة حسب الجهة</h2>
+        <div id="deptChart" class="bars"></div>
+        <h2 class="mt">حالة البلاغات</h2>
+        <div id="statusBar" class="status-bar" role="img" aria-label="نسب حالات البلاغات"></div>
+        <div id="statusLegend" class="legend"></div>
+        <div id="modelInfo" class="model-info"></div>
       </div>
     </section>
 
@@ -42,12 +55,33 @@
       <!-- نموذج إضافة بلاغ -->
       <section class="card">
         <h2>تسجيل بلاغ / طلب جديد</h2>
-        <form id="ticketForm">
+        <form id="ticketForm" autocomplete="off">
           <label>عنوان البلاغ
-            <input type="text" id="title" required placeholder="مثال: تعطل طابعة قسم الشؤون الإدارية" />
+            <input type="text" id="title" required maxlength="120" placeholder="مثال: الطابعة المشتركة متوقفة في الشؤون الإدارية" />
           </label>
 
-          <label>الإدارة / القسم
+          <label>وصف مختصر
+            <textarea id="description" rows="3" required maxlength="500" placeholder="اكتب تفاصيل المشكلة ومكانها..."></textarea>
+          </label>
+
+          <!-- اقتراح الذكاء الاصطناعي -->
+          <div id="aiBox" class="ai-box" hidden>
+            <div class="ai-head"><span class="ai-dot"></span> اقتراح الذكاء الاصطناعي</div>
+            <div class="ai-row">
+              <span>الجهة المختصة:</span> <b id="aiDept">-</b>
+              <span class="conf"><span id="aiDeptBar"></span></span> <small id="aiDeptConf"></small>
+            </div>
+            <div class="ai-row">
+              <span>الأولوية:</span> <b id="aiPriority">-</b>
+              <span class="conf"><span id="aiPrBar"></span></span> <small id="aiPrConf"></small>
+            </div>
+            <div class="ai-why" id="aiWhy"></div>
+          </div>
+
+          <!-- تنبيه البلاغات المتشابهة -->
+          <div id="similarBox" class="similar-box" hidden></div>
+
+          <label>الجهة المختصة
             <select id="department" required>
               <option value="تقنية المعلومات">تقنية المعلومات</option>
               <option value="الخدمات والصيانة">الخدمات والصيانة</option>
@@ -64,10 +98,7 @@
               <option value="منخفضة">منخفضة</option>
             </select>
           </label>
-
-          <label>وصف مختصر
-            <textarea id="description" rows="3" required placeholder="تفاصيل الموقع أو المشكلة..."></textarea>
-          </label>
+          <p class="muted small" id="manualNote">يعبّئ الذكاء الاصطناعي الجهة والأولوية تلقائياً، وتقدر تغيّرها بنفسك.</p>
 
           <button type="submit" class="btn btn-primary full-width">إضافة البلاغ</button>
         </form>
@@ -76,16 +107,35 @@
       <!-- قائمة البلاغات والفلترة -->
       <section class="card">
         <div class="table-header">
-          <h2>سجل البلاغات</h2>
-          <div class="filters">
-            <input type="text" id="searchInput" placeholder="بحث بالعنوان أو القسم..." />
-            <select id="statusFilter">
-              <option value="الكل">كل الحالات</option>
-              <option value="جديد">جديد</option>
-              <option value="قيد المعالجة">قيد المعالجة</option>
-              <option value="منجز">منجز</option>
-            </select>
-          </div>
+          <h2>سجل البلاغات <small class="muted" id="resultCount"></small></h2>
+        </div>
+        <div class="filters">
+          <input type="search" id="searchInput" placeholder="بحث بالعنوان أو الوصف أو الجهة..." aria-label="بحث" />
+          <select id="statusFilter" aria-label="الحالة">
+            <option value="الكل">كل الحالات</option>
+            <option value="جديد">جديد</option>
+            <option value="قيد المعالجة">قيد المعالجة</option>
+            <option value="منجز">منجز</option>
+          </select>
+          <select id="deptFilter" aria-label="الجهة">
+            <option value="الكل">كل الجهات</option>
+            <option value="تقنية المعلومات">تقنية المعلومات</option>
+            <option value="الخدمات والصيانة">الخدمات والصيانة</option>
+            <option value="الشؤون الإدارية">الشؤون الإدارية</option>
+            <option value="المشاريع">المشاريع</option>
+            <option value="خدمة المستفيدين">خدمة المستفيدين</option>
+          </select>
+          <select id="priorityFilter" aria-label="الأولوية">
+            <option value="الكل">كل الأولويات</option>
+            <option value="عالية">عالية</option>
+            <option value="متوسطة">متوسطة</option>
+            <option value="منخفضة">منخفضة</option>
+          </select>
+          <select id="sortSelect" aria-label="الترتيب">
+            <option value="smart">ترتيب ذكي (الأهم أولاً)</option>
+            <option value="newest">الأحدث</option>
+            <option value="oldest">الأقدم</option>
+          </select>
         </div>
 
         <div class="table-wrapper">
@@ -94,10 +144,10 @@
               <tr>
                 <th>الرقم</th>
                 <th>البلاغ</th>
-                <th>القسم</th>
+                <th>الجهة</th>
                 <th>الأولوية</th>
                 <th>الحالة</th>
-                <th>التاريخ</th>
+                <th>العمر</th>
                 <th>إجراء</th>
               </tr>
             </thead>
@@ -108,10 +158,13 @@
     </div>
   </main>
 
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
   <footer class="footer">
-    نموذج تجريبي لأغراض التدريب التعاوني - يعمل ببيانات افتراضية
+    رَصْد · نموذج تجريبي لأغراض التدريب التعاوني في أمانة منطقة حائل · يعمل ببيانات افتراضية ولا يرسل أي بيانات خارج المتصفح
   </footer>
 
+  <script src="ai.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
