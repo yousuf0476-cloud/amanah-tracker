@@ -14,10 +14,11 @@
         <div class="logo" aria-hidden="true">ر</div>
         <div>
           <h1>رَصْد <span>| منصة ذكية لمتابعة البلاغات والصيانة الداخلية</span></h1>
-          <p>أمانة منطقة حائل - إدارة تقنية المعلومات · نموذج أولي يعمل ببيانات افتراضية</p>
+          <p>أمانة منطقة حائل - إدارة تقنية المعلومات · نموذج أولي ببيانات افتراضية · قاعدة بيانات سحابية PostgreSQL</p>
         </div>
       </div>
       <div class="top-actions">
+        <span id="dbStatus" class="db-status">جارٍ الاتصال بقاعدة البيانات...</span>
         <button id="exportBtn" class="btn btn-outline" type="button">تصدير Excel (CSV)</button>
         <button id="resetDemoBtn" class="btn btn-outline" type="button">إعادة البيانات التجريبية</button>
       </div>
@@ -161,9 +162,10 @@
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <footer class="footer">
-    رَصْد · نموذج تجريبي لأغراض التدريب التعاوني في أمانة منطقة حائل · يعمل ببيانات افتراضية ولا يرسل أي بيانات خارج المتصفح
+    رَصْد · نموذج تجريبي لأغراض التدريب التعاوني في أمانة منطقة حائل · البيانات افتراضية ومحفوظة في قاعدة بيانات Supabase (PostgreSQL) · الذكاء الاصطناعي يعمل داخل المتصفح
   </footer>
 
+  <script src="db.js"></script>
   <script src="ai.js"></script>
   <script src="app.js"></script>
 </body>

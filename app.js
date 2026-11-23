@@ -1,10 +1,9 @@
 /* =========================================================================
-   app.js — منطق منصة رَصْد: البلاغات، الحفظ، العرض، الفلترة، والربط مع الذكاء الاصطناعي (ai.js)
+   app.js — منطق منصة رَصْد: البلاغات، العرض، الفلترة، والربط مع قاعدة البيانات (db.js) والذكاء الاصطناعي (ai.js)
    ========================================================================= */
 "use strict";
 
-const STORAGE_KEY = "rasd_tickets_v2";
-const OLD_KEY = "amanah_internal_tickets_v1"; // نسخة سابقة من النظام (يتم ترحيلها تلقائياً)
+const DB = window.RasdDB; // طبقة قاعدة البيانات (db.js)
 const STATUS_ORDER = ["جديد", "قيد المعالجة", "منجز"];
 const PRIORITY_RANK = { "عالية": 0, "متوسطة": 1, "منخفضة": 2 };
 const DEPTS = ["تقنية المعلومات", "الخدمات والصيانة", "الشؤون الإدارية", "المشاريع", "خدمة المستفيدين"];
@@ -33,24 +32,35 @@ function demoTickets() {
   ];
 }
 
-/* ---------- التخزين (مع ترحيل النسخة القديمة) ---------- */
-function loadTickets() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (Array.isArray(saved)) return saved;
-    const old = JSON.parse(localStorage.getItem(OLD_KEY));
-    if (Array.isArray(old)) {
-      return old.map(o => ({
-        ...o, createdAt: new Date(o.date).toISOString(), updatedAt: new Date(o.date).toISOString(),
-        resolvedAt: o.status === "منجز" ? new Date(o.date).toISOString() : null, ai: null
-      }));
-    }
-  } catch (e) { /* بيانات تالفة: نبدأ بالبيانات التجريبية */ }
-  return demoTickets();
+/* ---------- البيانات: قاعدة البيانات السحابية + نسخة احتياطية في المتصفح ---------- */
+let tickets = DB.cache.read() || [];   // نعرض آخر نسخة محفوظة فوراً، ثم نحدّث من قاعدة البيانات
+let busy = false;                       // يمنع التحديث الدوري أثناء تنفيذ عملية
+
+function setDbStatus() {
+  const el = $("dbStatus");
+  el.className = "db-status " + (DB.online ? "on" : "off");
+  el.textContent = DB.online ? "متصل بقاعدة البيانات" : "بدون اتصال · حفظ محلي";
+  el.title = DB.online ? "البيانات محفوظة في " + DB.provider : "تعذر الاتصال بقاعدة البيانات، يتم الحفظ في المتصفح مؤقتاً";
 }
-let tickets = loadTickets();
-function saveTickets() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets)); } catch (e) { toast("تعذر الحفظ في المتصفح"); }
+function saveLocal() { DB.cache.write(tickets); }
+
+// تنفيذ عملية على قاعدة البيانات، ولو فشل الاتصال نكمل محلياً بدون ما يضيع شي
+async function dbTry(fn, fallback) {
+  if (DB.online) {
+    try { const r = await fn(); saveLocal(); return r; }
+    catch (e) { DB.online = false; setDbStatus(); toast("تعذر الاتصال بقاعدة البيانات، تم الحفظ محلياً"); }
+  }
+  const r = fallback(); saveLocal(); return r;
+}
+
+async function loadFromDB() {
+  const list = await DB.list();
+  if (DB.online && list && list.length === 0) {
+    tickets = await DB.resetDemo(demoTickets()); // قاعدة بيانات فارغة: نضيف البيانات التجريبية
+    saveLocal();
+  } else if (list) tickets = list;
+  else if (!tickets.length) tickets = demoTickets(); // أول تشغيل بدون اتصال
+  setDbStatus(); retrain(); renderAll();
 }
 
 /* ---------- أدوات مساعدة ---------- */
@@ -198,22 +208,34 @@ function renderModelInfo() {
 function renderAll() { updateStats(); renderCharts(); renderInsights(); renderModelInfo(); renderTickets(); }
 
 /* ---------- الإجراءات ---------- */
-function advanceStatus(id) {
+async function advanceStatus(id) {
   const t = tickets.find(x => x.id === id);
-  if (!t) return;
-  t.status = STATUS_ORDER[(STATUS_ORDER.indexOf(t.status) + 1) % STATUS_ORDER.length];
-  t.updatedAt = new Date().toISOString();
-  t.resolvedAt = t.status === "منجز" ? t.updatedAt : null;
-  saveTickets(); renderAll();
+  if (!t || busy) return;
+  busy = true;
+  const status = STATUS_ORDER[(STATUS_ORDER.indexOf(t.status) + 1) % STATUS_ORDER.length];
+  const resolvedAt = status === "منجز" ? new Date().toISOString() : null;
+  await dbTry(
+    async () => { const u = await DB.update(id, { status, resolvedAt }); Object.assign(t, u || { status, resolvedAt }); },
+    () => Object.assign(t, { status, resolvedAt, updatedAt: new Date().toISOString() })
+  );
+  busy = false;
+  renderAll();
   toast(`البلاغ #${id}: ${t.status}`);
 }
 
-function deleteTicket(id) {
+async function deleteTicket(id) {
   const idx = tickets.findIndex(x => x.id === id);
-  if (idx < 0) return;
-  const [removed] = tickets.splice(idx, 1);
-  saveTickets(); retrain(); renderAll();
-  toast(`تم حذف البلاغ #${id}`, { label: "تراجع", run: () => { tickets.splice(idx, 0, removed); saveTickets(); retrain(); renderAll(); } });
+  if (idx < 0 || busy) return;
+  busy = true;
+  const removed = tickets[idx];
+  await dbTry(() => DB.remove(id), () => null);
+  tickets.splice(idx, 1);
+  saveLocal(); retrain(); renderAll(); busy = false;
+  toast(`تم حذف البلاغ #${id}`, { label: "تراجع", run: async () => {
+    await dbTry(async () => { await DB.restore(removed); }, () => null);
+    tickets.splice(Math.min(idx, tickets.length), 0, removed);
+    saveLocal(); retrain(); renderAll();
+  } });
 }
 
 // تفويض الأحداث: مستمع واحد للجدول بدل مستمع لكل زر
@@ -224,14 +246,15 @@ $("ticketsBody").addEventListener("click", e => {
   if (btn.dataset.action === "next") advanceStatus(id); else deleteTicket(id);
 });
 
-$("ticketForm").addEventListener("submit", e => {
+$("ticketForm").addEventListener("submit", async e => {
   e.preventDefault();
   const title = $("title").value.trim(), description = $("description").value.trim();
   if (!title || !description) return;
   const now = new Date().toISOString();
   const s = lastSuggestion || SmartAI.suggest(models, title + " " + description);
-  const t = {
-    id: tickets.length ? Math.max(...tickets.map(x => x.id)) + 1 : 101,
+  const btn = e.target.querySelector("button[type=submit]");
+  btn.disabled = true;
+  let t = {
     title, description,
     department: $("department").value,
     priority: $("priority").value,
@@ -239,8 +262,13 @@ $("ticketForm").addEventListener("submit", e => {
     createdAt: now, updatedAt: now, resolvedAt: null,
     ai: { dept: s.dept ? s.dept.label : null, priority: s.priority ? s.priority.label : null }
   };
+  t = await dbTry(
+    () => DB.add(t),                                                                       // قاعدة البيانات تعطي الرقم
+    () => ({ ...t, id: tickets.length ? Math.max(...tickets.map(x => x.id)) + 1 : 101 })  // بدون اتصال
+  );
   tickets.unshift(t);
-  saveTickets();
+  saveLocal();
+  btn.disabled = false;
   retrain(); // النموذج يتعلم من البلاغ الجديد
   renderAll();
   e.target.reset();
@@ -258,8 +286,11 @@ const onFilter = debounce(renderTickets, 120);
 $("searchInput").addEventListener("input", onFilter);
 ["statusFilter", "deptFilter", "priorityFilter", "sortSelect"].forEach(id => $(id).addEventListener("change", renderTickets));
 
-$("resetDemoBtn").addEventListener("click", () => {
-  tickets = demoTickets(); saveTickets(); retrain(); renderAll();
+$("resetDemoBtn").addEventListener("click", async () => {
+  if (busy) return;
+  busy = true;
+  tickets = await dbTry(() => DB.resetDemo(demoTickets()), () => demoTickets());
+  saveLocal(); retrain(); renderAll(); busy = false;
   toast("تمت إعادة البيانات التجريبية");
 });
 
@@ -277,4 +308,16 @@ $("exportBtn").addEventListener("click", () => {
   URL.revokeObjectURL(a.href);
 });
 
+// تحديث تلقائي كل 20 ثانية وعند الرجوع للصفحة: يظهر بلاغات المستخدمين الآخرين
+async function refresh() {
+  if (busy || document.hidden) return;
+  const list = await DB.list();
+  // نعيد الرسم فقط إذا تغيّرت البيانات فعلاً (أداء أفضل، والأزرار ما تتحرك تحت يد المستخدم)
+  if (list && !busy && JSON.stringify(list) !== JSON.stringify(tickets)) { tickets = list; retrain(); renderAll(); }
+  setDbStatus();
+}
+setInterval(refresh, 20000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
 renderAll();
+loadFromDB();
