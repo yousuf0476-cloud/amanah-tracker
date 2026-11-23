@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نظام متابعة البلاغات والصيانة الداخلية</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-content">
+      <div>
+        <h1>نظام متابعة البلاغات والصيانة الداخلية</h1>
+        <p>نموذج أولي لإدارة ومتابعة الطلبات الفنية والإدارية - فترة التدريب التعاوني</p>
+      </div>
+      <button id="resetDemoBtn" class="btn btn-outline">إعادة البيانات التجريبية</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- بطاقات الإحصائيات -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <span>إجمالي البلاغات</span>
+        <strong id="totalCount">0</strong>
+      </div>
+      <div class="stat-card">
+        <span>جديد</span>
+        <strong id="newCount">0</strong>
+      </div>
+      <div class="stat-card">
+        <span>قيد المعالجة</span>
+        <strong id="progressCount">0</strong>
+      </div>
+      <div class="stat-card">
+        <span>منجز</span>
+        <strong id="doneCount">0</strong>
+      </div>
+    </section>
+
+    <div class="layout-grid">
+      <!-- نموذج إضافة بلاغ -->
+      <section class="card">
+        <h2>تسجيل بلاغ / طلب جديد</h2>
+        <form id="ticketForm">
+          <label>عنوان البلاغ
+            <input type="text" id="title" required placeholder="مثال: تعطل طابعة قسم الشؤون الإدارية" />
+          </label>
+
+          <label>الإدارة / القسم
+            <select id="department" required>
+              <option value="تقنية المعلومات">تقنية المعلومات</option>
+              <option value="الخدمات والصيانة">الخدمات والصيانة</option>
+              <option value="الشؤون الإدارية">الشؤون الإدارية</option>
+              <option value="المشاريع">المشاريع</option>
+              <option value="خدمة المستفيدين">خدمة المستفيدين</option>
+            </select>
+          </label>
+
+          <label>الأولوية
+            <select id="priority" required>
+              <option value="عالية">عالية</option>
+              <option value="متوسطة" selected>متوسطة</option>
+              <option value="منخفضة">منخفضة</option>
+            </select>
+          </label>
+
+          <label>وصف مختصر
+            <textarea id="description" rows="3" required placeholder="تفاصيل الموقع أو المشكلة..."></textarea>
+          </label>
+
+          <button type="submit" class="btn btn-primary full-width">إضافة البلاغ</button>
+        </form>
+      </section>
+
+      <!-- قائمة البلاغات والفلترة -->
+      <section class="card">
+        <div class="table-header">
+          <h2>سجل البلاغات</h2>
+          <div class="filters">
+            <input type="text" id="searchInput" placeholder="بحث بالعنوان أو القسم..." />
+            <select id="statusFilter">
+              <option value="الكل">كل الحالات</option>
+              <option value="جديد">جديد</option>
+              <option value="قيد المعالجة">قيد المعالجة</option>
+              <option value="منجز">منجز</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>الرقم</th>
+                <th>البلاغ</th>
+                <th>القسم</th>
+                <th>الأولوية</th>
+                <th>الحالة</th>
+                <th>التاريخ</th>
+                <th>إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="ticketsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    نموذج تجريبي لأغراض التدريب التعاوني - يعمل ببيانات افتراضية
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
